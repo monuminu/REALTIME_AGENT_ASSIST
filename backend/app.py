@@ -95,8 +95,11 @@ class ConnectionManager:
         for connection in self.active_connections.values():
             try:
                 await connection.send_text(message)
+            except WebSocketDisconnect:
+                logging.info("Client disconnected")
             except Exception as e:
-                logging.error(f"Error broadcasting message: {str(e)}")
+                logging.error(traceback.format_exc())
+                logging.error(f"Error broadcasting message: {str(e)} message: {message}")
 
     async def send_personal_message(self, message: str, client_id: str):
         if client_id in self.active_connections:
@@ -269,11 +272,8 @@ async def outbound_call_handler(request: Request):
         
         call_guid = str(uuid.uuid4())
         
-        callback_base_url = str(request.base_url)
-        if callback_base_url.startswith("http://"):
-            callback_base_url = callback_base_url.replace("http://", "https://")
             
-        CALLBACK_EVENTS_URI = urljoin(callback_base_url, "api/callbacks")
+        CALLBACK_EVENTS_URI = urljoin(WEBSOCKET_URL.replace("wss://", "https://"), "api/callbacks")
         
         query_parameters = urlencode({"callerId": source_phone_number})
         callback_uri = f"{CALLBACK_EVENTS_URI}/{call_guid}?{query_parameters}"
@@ -288,7 +288,7 @@ async def outbound_call_handler(request: Request):
             content_type=MediaStreamingContentType.AUDIO,
             audio_channel_type=MediaStreamingAudioChannelType.MIXED,
             start_media_streaming=True,
-            enable_bidirectional=False,
+            enable_bidirectional=True,
             audio_format=AudioFormat.PCM16_K_MONO
         )
         
@@ -383,11 +383,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
                         }))
     
     except WebSocketDisconnect:
-        manager.disconnect(client_id)
         await manager.broadcast(json.dumps({
             "type": "clientDisconnected",
             "clientId": client_id
         }))
+        #manager.disconnect(client_id)
 
 # WebSocket endpoint for audio streaming
 @app.websocket("/ws/audio/{call_id}")
@@ -395,35 +395,59 @@ async def websocket_audio_endpoint(websocket: WebSocket, call_id: str):
     client_id = f"audio_{call_id}"
     await manager.connect(websocket, client_id)
     logging.info(f"WebSocket connection established for call {call_id}")
-    
+    speech_recognizer, audio_input_stream = manager.setup_speech_recognizer(call_id) 
+    speech_recognizer.start_continuous_recognition() 
     try:
         while True:
             # Receive audio chunk
-            control = await websocket.receive_text()
+            message = await websocket.receive()
             try:
-                control = json.loads(control)
-                if control.get("kind") == "AudioMetadata":
-                    logging.info(f"Audio Metadata: {control}")
-                    sample_rate = control["audioMetadata"]["sampleRate"]
-                    speech_recognizer, audio_input_stream = manager.setup_speech_recognizer(call_id, samples_per_second=sample_rate) 
-                    speech_recognizer.start_continuous_recognition() 
-                elif control.get("kind") == "AudioData":
-                    chunk = base64.b64decode(control["audioData"]["data"])
-                    if call_id in manager.audio_streams:
+                if "text" in message:
+                    try:
+                        control = json.loads(message["text"])
+                        if control.get("kind") == "AudioMetadata":
+                            logging.info(f"Audio Metadata: {control}")
+                            sample_rate = control["audioMetadata"]["sampleRate"]
+                        elif control.get("kind") == "AudioData":
+                            chunk = base64.b64decode(control["audioData"]["data"])
+                            await manager.broadcast(json.dumps({
+                                "type": "audioStream",
+                                "callId": call_id,
+                                "sampleRate": sample_rate,
+                                "data": base64.b64encode(chunk).decode("utf-8"),
+                            }))
+                            if call_id in manager.audio_streams:
+                                manager.audio_streams[call_id].write(chunk)
+                            else:
+                                audio_input_stream.write(chunk)
+                    except json.JSONDecodeError:
+                        logging.warning(f"Received non-JSON data from audio stream: {message['text'][:50]}...")
+                elif "bytes" in message:
+                    if audio_input_stream:
+                        chunk = message["bytes"]
                         manager.audio_streams[call_id].write(chunk)
-                    else:
-                        logging.warning(f"Received audio data for call {call_id} but no audio input stream exists")
-            except json.JSONDecodeError:
-                logging.warning(f"Received non-JSON data from audio stream: {control[:50]}...")
+                        await manager.broadcast(json.dumps({
+                                "Kind": "AudioData",
+                                "AudioData": {
+                                        "Data":  base64.b64encode(chunk).decode("utf-8")
+                                },
+                                "StopAudio": None
+                            }))
+                elif message.get("type") == "websocket.disconnect":
+                    logging.info(f"Received disconnect message: {message}")
+                    break
+                else:
+                    logging.warning(f"Received unknown message type: {message}")
+            except Exception as e:
+                logging.error(f"Error processing audio message: {str(e)}")
+                break  # Exit the loop on any unhandled exception to ensure proper cleanup
     
     except WebSocketDisconnect:
-        manager.disconnect(client_id)
         logging.info(f"WebSocket connection closed for call {call_id}")
     
     except Exception as e:
         logging.error(traceback.format_exc())
         logging.error(f"Error in WebSocket audio endpoint: {str(e)}")
-        manager.disconnect(client_id)
 
 # Process queued messages
 async def process_message_queue():

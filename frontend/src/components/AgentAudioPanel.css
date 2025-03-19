@@ -1,0 +1,49 @@
+.agent-audio-panel {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 15px;
+  }
+  
+  .audio-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  
+  .mute-button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .mute-button.muted {
+    background-color: #dc3545;
+  }
+  
+  .mute-button:hover {
+    opacity: 0.9;
+  }
+  
+  .status-indicator {
+    font-size: 14px;
+  }
+  
+  .connected {
+    color: #28a745;
+  }
+  
+  .disconnected {
+    color: #dc3545;
+  }
+  
+  .error-message {
+    color: #dc3545;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }

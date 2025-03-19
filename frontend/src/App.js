@@ -7,8 +7,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import AgentAudioPanel from './components/AgentAudioPanel';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-const WS_BASE_URL = process.env.REACT_APP_WS_BASE_URL || 'ws://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
 function App() {
   const [callStatus, setCallStatus] = useState('idle'); // idle, initiating, connected, disconnected
@@ -205,8 +204,8 @@ function App() {
           />
           
           { callStatus === 'connected' && currentCall && (
-            <AgentAudioPanel callId={currentCall.id} wsBaseUrl={WS_BASE_URL} />
-          ) }
+            <AgentAudioPanel callId={currentCall.id} wsBaseUrl={API_BASE_URL} />
+          )}
         </div>
       </div>
       
