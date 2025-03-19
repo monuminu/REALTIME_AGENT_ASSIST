@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+websockets
+azure-communication-callautomation
+azure-communication-identity
+azure-cognitiveservices-speech
+pydantic
+python-multipart
+pydub
+numpy
+aiohttp
+python-dotenv
+audioop-lts

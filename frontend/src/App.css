@@ -1,0 +1,88 @@
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  .app-header {
+    background-color: #0078d4;
+    color: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .app-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+  }
+  
+  .connection-status {
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+  }
+  
+  .status-connected {
+    color: #4caf50;
+    font-weight: bold;
+  }
+  
+  .status-connected::before {
+    content: '•';
+    display: inline-block;
+    margin-right: 5px;
+    color: #4caf50;
+  }
+  
+  .status-disconnected {
+    color: #f44336;
+    font-weight: bold;
+  }
+  
+  .status-disconnected::before {
+    content: '•';
+    display: inline-block;
+    margin-right: 5px;
+    color: #f44336;
+  }
+  
+  .app-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  .left-panel {
+    width: 35%;
+    min-width: 350px;
+    border-right: 1px solid #e0e0e0;
+    overflow-y: auto;
+  }
+  
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  @media (max-width: 768px) {
+    .app-content {
+      flex-direction: column;
+    }
+    
+    .left-panel {
+      width: 100%;
+      min-width: 0;
+      border-right: none;
+      border-bottom: 1px solid #e0e0e0;
+      max-height: 40vh;
+    }
+    
+    .right-panel {
+      height: 60vh;
+    }
+  }
