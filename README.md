@@ -46,10 +46,6 @@ You need to run both the main backend server and the WebSocket server:
 # Terminal 1: Run the main backend server
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 
-# Terminal 2: Run the WebSocket server
-uvicorn websocket_server:app --reload --host 0.0.0.0 --port 8001
-```
-
 ## Frontend Setup
 
 ### 1. Install Node.js Dependencies
@@ -67,7 +63,6 @@ Create a `.env` file in the frontend directory with the following content:
 
 ```
 REACT_APP_API_BASE_URL=http://localhost:8000
-REACT_APP_WS_BASE_URL=ws://localhost:8000
 ```
 
 Adjust these URLs if your backend is running on a different host or port.
