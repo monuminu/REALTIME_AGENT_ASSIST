@@ -11,3 +11,8 @@ numpy
 aiohttp
 python-dotenv
 audioop-lts
+openai
+pandas
+azure-search-documents
+openpyxl
+tabulate
