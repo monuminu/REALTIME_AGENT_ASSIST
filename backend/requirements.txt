@@ -16,3 +16,4 @@ pandas
 azure-search-documents
 openpyxl
 tabulate
+scipy

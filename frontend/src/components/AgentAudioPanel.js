@@ -11,6 +11,7 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
   const wsRef = useRef(null);
   const audioContextRef = useRef(null);
   const mediaStreamSourcesRef = useRef(new Map());
+  const gainNodeRef = useRef(null);
   
   // Move getRawMicrophoneStream BEFORE startStreaming
   const getRawMicrophoneStream = useCallback(async () => {
@@ -40,12 +41,12 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
     }
   }, []);
   
-  // Function to handle incoming audio data
+  // Improved playAudioStream implementation
   const playAudioStream = useCallback((audioData, sampleRate) => {
     if (!audioContextRef.current) return;
     
     try {
-      // Decode base64 data to ArrayBuffer
+      // Decode base64 data to ArrayBuffer more efficiently
       const byteCharacters = atob(audioData);
       const byteArray = new Uint8Array(byteCharacters.length);
       
@@ -53,29 +54,44 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
         byteArray[i] = byteCharacters.charCodeAt(i);
       }
       
-      // Convert to 16-bit PCM audio
-      const audioBuffer = new Int16Array(byteArray.buffer);
+      // Create a proper WAV-like header for better decoding
+      const audioDataWithHeader = createWavHeader(byteArray, sampleRate, 1, 16);
       
-      // Convert to float32 for Web Audio API
-      const float32Audio = new Float32Array(audioBuffer.length);
-      for (let i = 0; i < audioBuffer.length; i++) {
-        float32Audio[i] = audioBuffer[i] / 32768.0;
-      }
-      
-      // Create audio buffer and source
-      const buffer = audioContextRef.current.createBuffer(1, float32Audio.length, sampleRate);
-      buffer.getChannelData(0).set(float32Audio);
-      
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = buffer;
-      source.connect(audioContextRef.current.destination);
-      source.start(0);
-      setIsPlayingAudio(true);
-      
-      // Reset playing indicator when audio finishes
-      source.onended = () => {
-        setIsPlayingAudio(false);
-      };
+      // Use AudioContext's decodeAudioData with improved error handling
+      audioContextRef.current.decodeAudioData(
+        audioDataWithHeader, 
+        (decodedBuffer) => {
+          // Create and configure audio source
+          const source = audioContextRef.current.createBufferSource();
+          source.buffer = decodedBuffer;
+          
+          // Apply audio enhancements if available
+          if (gainNodeRef.current) {
+            // Connect through gain node for volume control
+            source.connect(gainNodeRef.current);
+          } else {
+            source.connect(audioContextRef.current.destination);
+          }
+          
+          source.start(0);
+          setIsPlayingAudio(true);
+          
+          source.onended = () => {
+            setIsPlayingAudio(false);
+          };
+        },
+        (error) => {
+          console.error("Error decoding audio data:", error);
+          
+          // Fallback approach for problematic audio
+          try {
+            // Try direct PCM playback as fallback
+            playPcmDirectly(byteArray);
+          } catch (fallbackError) {
+            console.error("Fallback playback failed:", fallbackError);
+          }
+        }
+      );
     } catch (error) {
       console.error('Error playing audio stream:', error);
     }
@@ -118,7 +134,7 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
   // Set up WebSocket connection and microphone stream when component mounts
   useEffect(() => {
     // Create audio context with 16kHz sample rate
-    const sampleRate = 16000;
+    const sampleRate = 24000;
     audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: sampleRate
     });
@@ -214,6 +230,89 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
     return int16Array;
   }
   
+  // Helper function to create proper WAV headers
+  function createWavHeader(pcmData, sampleRate, numChannels, bitsPerSample) {
+    const dataLength = pcmData.length;
+    const headerLength = 44;
+    const wavData = new Uint8Array(headerLength + dataLength);
+    
+    // RIFF header
+    setString(wavData, 0, 'RIFF');
+    setUint32(wavData, 4, 36 + dataLength, true);
+    setString(wavData, 8, 'WAVE');
+    
+    // fmt chunk
+    setString(wavData, 12, 'fmt ');
+    setUint32(wavData, 16, 16, true);
+    setUint16(wavData, 20, 1, true);
+    setUint16(wavData, 22, numChannels, true);
+    setUint32(wavData, 24, sampleRate, true);
+    setUint32(wavData, 28, sampleRate * numChannels * bitsPerSample / 8, true);
+    setUint16(wavData, 32, numChannels * bitsPerSample / 8, true);
+    setUint16(wavData, 34, bitsPerSample, true);
+    
+    // data chunk
+    setString(wavData, 36, 'data');
+    setUint32(wavData, 40, dataLength, true);
+    
+    // Copy PCM data
+    wavData.set(pcmData, 44);
+    
+    return wavData.buffer;
+  }
+  
+  // Helper functions for WAV header creation
+  function setString(data, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      data[offset + i] = string.charCodeAt(i);
+    }
+  }
+  
+  function setUint16(data, offset, value, littleEndian) {
+    if (littleEndian) {
+      data[offset] = value & 0xFF;
+      data[offset + 1] = (value >> 8) & 0xFF;
+    } else {
+      data[offset] = (value >> 8) & 0xFF;
+      data[offset + 1] = value & 0xFF;
+    }
+  }
+  
+  function setUint32(data, offset, value, littleEndian) {
+    if (littleEndian) {
+      data[offset] = value & 0xFF;
+      data[offset + 1] = (value >> 8) & 0xFF;
+      data[offset + 2] = (value >> 16) & 0xFF;
+      data[offset + 3] = (value >> 24) & 0xFF;
+    } else {
+      data[offset] = (value >> 24) & 0xFF;
+      data[offset + 1] = (value >> 16) & 0xFF;
+      data[offset + 2] = (value >> 8) & 0xFF;
+      data[offset + 3] = value & 0xFF;
+    }
+  }
+  
+  // Direct PCM playback as a fallback
+  function playPcmDirectly(pcmData) {
+    if (!audioContextRef.current) return;
+    
+    // Create a buffer with the right format for PCM
+    const buffer = audioContextRef.current.createBuffer(1, pcmData.length / 2, 16000);
+    const channelData = buffer.getChannelData(0);
+    
+    // Convert Uint8Array to Float32Array for AudioBuffer
+    for (let i = 0; i < pcmData.length / 2; i++) {
+      const sample = (pcmData[i*2] | (pcmData[i*2+1] << 8)) / 32768.0;
+      channelData[i] = sample;
+    }
+    
+    // Play the buffer
+    const source = audioContextRef.current.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContextRef.current.destination);
+    source.start(0);
+  }
+  
   return (
     <div className="agent-audio-panel">
       <h3>Agent Audio Controls</h3>
@@ -233,6 +332,7 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
           ) : (
             <span className="disconnected">Audio Disconnected</span>
           )}
+
         </div>
       </div>
     </div>

@@ -19,7 +19,8 @@ from dotenv import load_dotenv
 import time
 load_dotenv()
 from openai import AzureOpenAI, OpenAI
-
+import numpy as np
+from scipy import signal
 
 with open("system_prompt.txt", "r") as f:
     system_prompt = f.read()
@@ -411,7 +412,7 @@ async def outbound_call_handler(request: Request):
             audio_channel_type=MediaStreamingAudioChannelType.UNMIXED,
             start_media_streaming=True,
             enable_bidirectional=True,
-            audio_format=AudioFormat.PCM16_K_MONO
+            audio_format=AudioFormat.PCM24_K_MONO
         )
         
         target_participant = PhoneNumberIdentifier(target_phone_number)
@@ -530,13 +531,13 @@ async def websocket_audio_endpoint(websocket: WebSocket, call_id: str):
                             logging.info(f"Audio Metadata: {control}")
                             sample_rate = control["audioMetadata"]["sampleRate"]
                         elif control.get("kind") == "AudioData":
-                            chunk = base64.b64decode(control["audioData"]["data"])
                             await manager.broadcast(json.dumps({
                                 "type": "audioStream",
                                 "callId": call_id,
                                 "sampleRate": sample_rate,
-                                "data": base64.b64encode(chunk).decode("utf-8"),
+                                "data": control["audioData"]["data"],
                             }))
+                            chunk = base64.b64decode(control["audioData"]["data"])
                             manager.customer_audio_streams[call_id].write(chunk)
                     except json.JSONDecodeError:
                         logging.warning(f"Received non-JSON data from audio stream: {message['text'][:50]}...")

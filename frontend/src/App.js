@@ -39,7 +39,7 @@ function App() {
 
   useEffect(() => {
     if (callStatus === 'connected') {
-      const interval = setInterval(fetchRecommendation, 30000); // fetch every 30 seconds
+      const interval = setInterval(fetchRecommendation, 10000); // fetch every 30 seconds
       return () => clearInterval(interval);
     }
   }, [callStatus, fetchRecommendation]);
