@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AgentPanel.css';
 
-const AgentPanel = ({ callStatus, currentCall }) => {
+const AgentPanel = ({ callStatus, currentCall, recommendation }) => {
   const [notes, setNotes] = useState('');
   const [savedNotes, setSavedNotes] = useState({});
   
@@ -79,6 +79,21 @@ const AgentPanel = ({ callStatus, currentCall }) => {
           ) : (
             <div className="no-suggestions">
               Suggestions will appear during an active call
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="suggested-responses">
+        <h3>AI Recommendation</h3>
+        <div className="response-list">
+          {callStatus === 'connected' && recommendation ? (
+            <div className="ai-recommendation">
+              {recommendation}
+            </div>
+          ) : (
+            <div className="no-suggestions">
+              Recommendations will appear during an active call
             </div>
           )}
         </div>

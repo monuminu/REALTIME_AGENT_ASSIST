@@ -11,12 +11,7 @@ const TranscriptionPanel = ({ transcriptions, clearTranscriptions }) => {
     }
   }, [transcriptions]);
   
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';
-    
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  };
+
   
   return (
     <div className="transcription-panel">
@@ -38,13 +33,17 @@ const TranscriptionPanel = ({ transcriptions, clearTranscriptions }) => {
           </div>
         ) : (
           transcriptions.map((item, index) => (
-            <div key={index} className="transcription-item">
-              <div className="transcription-time">
-                {formatTimestamp(item.timestamp)}
-              </div>
-              <div className="transcription-text">
-                {item.text}
-              </div>
+            <div 
+              key={index} 
+              className={`transcription-item ${item.speaker === 'agent' ? 'agent-speech' : 'customer-speech'}`}
+            >
+              <span className="speaker-label">{item.speaker === 'agent' ? 'Agent' : 'Customer'}:</span>
+              <span className="transcription-text">{item.text}</span>
+              {item.timestamp && (
+                <span className="transcription-time">
+                  {new Date(item.timestamp).toLocaleTimeString()}
+                </span>
+              )}
             </div>
           ))
         )}

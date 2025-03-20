@@ -8,6 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import AgentAudioPanel from './components/AgentAudioPanel';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+const recommendationWorker = new Worker(new URL('./components/recommendationWorker.js', import.meta.url));
 
 function App() {
   const [callStatus, setCallStatus] = useState('idle'); // idle, initiating, connected, disconnected
@@ -15,25 +16,50 @@ function App() {
   const [transcriptions, setTranscriptions] = useState([]);
   const [agentId] = useState(`agent-${Math.floor(Math.random() * 1000)}`);
   const [connected, setConnected] = useState(false);
-  
+  const [recommendation, setRecommendation] = useState('');
   const wsRef = useRef(null);
-  
+  const fetchRecommendation = useCallback(() => {
+    if (!currentCall?.id) return;
+
+    recommendationWorker.postMessage({
+      apiUrl: `${API_BASE_URL}/api/recommendation/${agentId}`
+    });
+  }, [currentCall, agentId]);
+
+  useEffect(() => {
+    recommendationWorker.onmessage = (event) => {
+      const { success, data, error } = event.data;
+      if (success) {
+        setRecommendation(data.recommendation);
+      } else {
+        toast.error(error || "Failed to fetch recommendation");
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (callStatus === 'connected') {
+      const interval = setInterval(fetchRecommendation, 30000); // fetch every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [callStatus, fetchRecommendation]);
+
   const connectWebSocket = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close();
     }
-    
+
     const ws = new WebSocket(`${API_BASE_URL}/ws/agent/${agentId}`);
-    
+
     ws.onopen = () => {
       console.log('WebSocket connection established');
       setConnected(true);
       toast.success('Connected to server');
     };
-    
+
     ws.onmessage = (event) => {
       const message = JSON.parse(event.data);
-      
+
       switch (message.type) {
         case 'callStatus':
           handleCallStatusUpdate(message);
@@ -51,25 +77,25 @@ function App() {
           console.log('Received message:', message);
       }
     };
-    
+
     ws.onclose = () => {
       console.log('WebSocket connection closed');
       setConnected(false);
       toast.error('Disconnected from server');
     };
-    
+
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
       toast.error('WebSocket connection error');
     };
-    
+
     wsRef.current = ws;
   }, [agentId]); // Add agentId as a dependency
-  
+
   useEffect(() => {
     // Connect to WebSocket when component mounts
     connectWebSocket();
-    
+
     // Clean up on unmount
     return () => {
       if (wsRef.current) {
@@ -77,10 +103,10 @@ function App() {
       }
     };
   }, [connectWebSocket]); // Add connectWebSocket as a dependency
-  
+
   const handleCallStatusUpdate = (message) => {
     setCallStatus(message.status);
-    
+
     switch (message.status) {
       case 'initiated':
         setCurrentCall({
@@ -102,7 +128,7 @@ function App() {
         setCurrentCall(prev => prev && {
           ...prev,
           endTime: new Date(),
-          duration: prev.connectedTime ? 
+          duration: prev.connectedTime ?
             (new Date() - prev.connectedTime) / 1000 : 0
         });
         toast.info('Call disconnected');
@@ -111,18 +137,19 @@ function App() {
         break;
     }
   };
-  
+
   const handleTranscription = (message) => {
     setTranscriptions(prev => [...prev, {
       timestamp: message.timestamp,
-      text: message.text
+      text: message.text,
+      speaker: message.speaker
     }]);
   };
-  
+
   const initiateCall = async (phoneNumber, botId) => {
     try {
       setCallStatus('initiating');
-      
+
       const response = await fetch(`${API_BASE_URL}/api/outboundCall`, {
         method: 'POST',
         headers: {
@@ -133,15 +160,15 @@ function App() {
           botId
         })
       });
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to initiate call');
       }
-      
+
       console.log('Call initiated:', data);
-      
+
       // We'll get the call status updates via WebSocket
     } catch (error) {
       console.error('Error initiating call:', error);
@@ -149,7 +176,7 @@ function App() {
       setCallStatus('idle');
     }
   };
-  
+
   const endCall = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
@@ -157,10 +184,10 @@ function App() {
       }));
     }
   };
-  
+
   const clearTranscriptions = () => {
     setTranscriptions([]);
-    
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN && currentCall) {
       wsRef.current.send(JSON.stringify({
         type: 'clearTranscription',
@@ -168,7 +195,7 @@ function App() {
       }));
     }
   };
-  
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -181,7 +208,7 @@ function App() {
           )}
         </div>
       </header>
-      
+
       <div className="app-content">
         <div className="left-panel">
           <CallPanel
@@ -190,25 +217,26 @@ function App() {
             initiateCall={initiateCall}
             endCall={endCall}
           />
+          {callStatus === 'connected' && currentCall && (
+            <AgentAudioPanel callId={currentCall.id} wsBaseUrl={API_BASE_URL} />
+          )}
         </div>
-        
+
         <div className="right-panel">
           <TranscriptionPanel
             transcriptions={transcriptions}
             clearTranscriptions={clearTranscriptions}
           />
-          
+
           <AgentPanel
             callStatus={callStatus}
             currentCall={currentCall}
+            recommendation={recommendation}
           />
-          
-          { callStatus === 'connected' && currentCall && (
-            <AgentAudioPanel callId={currentCall.id} wsBaseUrl={API_BASE_URL} />
-          )}
+
         </div>
       </div>
-      
+
       <ToastContainer position="bottom-right" />
     </div>
   );

@@ -233,7 +233,6 @@ function AgentAudioPanel({ callId, wsBaseUrl }) {
           ) : (
             <span className="disconnected">Audio Disconnected</span>
           )}
-          {isPlayingAudio && <span className="playing-indicator"> (Playing Audio)</span>}
         </div>
       </div>
     </div>

@@ -68,3 +68,21 @@
   .transcription-text {
     line-height: 1.5;
   }
+
+  /* In your CSS file */
+.agent-speech {
+  background-color: #e1f5fe;
+  margin-left: 20%;
+  border-radius: 10px 10px 0 10px;
+}
+
+.customer-speech {
+  background-color: #f5f5f5;
+  margin-right: 20%;
+  border-radius: 10px 10px 10px 0;
+}
+
+.speaker-label {
+  font-weight: bold;
+  margin-right: 8px;
+}
