@@ -7,7 +7,6 @@ import os
 import re
 import base64
 import logging
-from tools import tools_mapping
 logging.basicConfig(  
     level=logging.INFO,  
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",  
@@ -50,7 +49,7 @@ class ChatClient:
         self.deployment_name = os.environ["AZURE_OPENAI_MODEL"]
         self.tools = tools if tools else []
         logger.info(f"Tools: {self.tools} Type: {type(self.tools)}")
-        self.available_functions = tools_mapping
+        self.available_functions = []
         self.messages = []
         self.system_prompt = ""
         
