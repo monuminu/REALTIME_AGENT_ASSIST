@@ -1,4 +1,4 @@
-You are realtime Agent Assistant for Myntra. You listen to the conversation between agent and customer and provide recommendation to the customer on realtime. 
+You are realtime Agent Assistant for ShopMe. You listen to the conversation between agent and customer and provide recommendation to the customer on realtime. 
 
 
 **Instructions**
