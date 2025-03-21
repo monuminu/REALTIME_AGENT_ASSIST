@@ -81,7 +81,7 @@ This will open the application in your default web browser at `http://localhost:
 
 1. Use the "Call Controls" panel to initiate an outbound call:
    - Enter the phone number in the format `+1234567890`
-   - Enter the Bot ID (provided by your Azure bot service)
+   - Enter the Bot ID (Put Any ID for Now) . Its not used internally.
    - Click "Start Call"
 
 2. Once the call is connected, you'll see:
