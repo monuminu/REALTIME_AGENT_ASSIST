@@ -24,8 +24,7 @@ from scipy import signal
 
 with open("system_prompt.txt", "r") as f:
     system_prompt = f.read()
-tools = [{"type": "function", "function": {"name": "get_all_order_for_customer", "type": "function", "parameters": {"type": "object", "required": ["phone_number"], "properties": {"phone_number": {"type": "string", "description": "The phone number associated with the order"}}}, "description": "Retrieve all orders for a specific customer"}}, {"type": "function", "function": {"name": "get_all_refund_details_for_customer", "type": "function", "parameters": {"type": "object", "required": ["phone_number"], "properties": {"phone_number": {"type": "string", "description": "The phone number associated with the order"}}}, "description": "Retrieve all refund details for a specific customer"}}, {"type": "function", "function": {"name": "raise_ticket", "type": "function", "parameters": {"type": "object", "required": ["customer_id", "issue"], "properties": {"issue": {"type": "string", "description": "The issue or question to be addressed"}, "customer_id": {"type": "string", "description": "The unique identifier for the customer"}}}, "description": "Raise a ticket for customer service"}}]
-# Azure Communication Services imports
+tools = []
 from azure.communication.callautomation import (
     MediaStreamingOptions,
     AudioFormat,
