@@ -57,9 +57,20 @@ Navigate to the frontend directory and install the dependencies:
 npm install
 ```
 
+### Setup and host your Azure DevTunnel
+
+[Azure DevTunnels](https://learn.microsoft.com/en-us/azure/developer/dev-tunnels/overview) is an Azure service that enables you to share local web services hosted on the internet. Use the commands below to connect your local development environment to the public internet. This creates a tunnel with a persistent endpoint URL and which allows anonymous access. We will then use this endpoint to notify your application of calling events from the ACS Call Automation service.
+
+```bash
+devtunnel create --allow-anonymous
+devtunnel port create -p 8000
+devtunnel host
+```
+
+
 ### 2. Configure API Endpoints
 
-Create a `.env` file in the frontend directory with the following content:
+Create a `.env` file in the frontend directory with the following content: Base url of the app. (For local development use dev tunnel url)
 
 ```
 REACT_APP_API_BASE_URL=http://localhost:8000
