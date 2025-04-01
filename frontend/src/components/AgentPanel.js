@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AgentPanel.css';
 
-const AgentPanel = ({ callStatus, currentCall, recommendation }) => {
+const AgentPanel = ({ callStatus, currentCall, recommendation, sentiment }) => {
   const [notes, setNotes] = useState('');
   const [savedNotes, setSavedNotes] = useState({});
   
@@ -40,49 +40,86 @@ const AgentPanel = ({ callStatus, currentCall, recommendation }) => {
       handleSaveNotes();
     }
   };
+
+  // Get sentiment color and label
+  const getSentimentInfo = () => {
+    const confidenceScores = sentiment?.confidenceScores || { positive: 0, neutral: 0, negative: 0 };
+    
+    // Calculate dominant sentiment
+    const dominantSentiment = Object.keys(confidenceScores).reduce(
+      (max, key) => confidenceScores[key] > confidenceScores[max] ? key : max, 
+      Object.keys(confidenceScores)[0]
+    );
+    
+    // Determine color and label based on dominant sentiment
+    switch(dominantSentiment) {
+      case 'positive':
+        return { 
+          color: '#4caf50', 
+          label: 'Positive',
+          score: confidenceScores.positive
+        };
+      case 'neutral':
+        return { 
+          color: '#ffeb3b', 
+          label: 'Neutral',
+          score: confidenceScores.neutral
+        };
+      case 'negative':
+        return { 
+          color: '#f44336', 
+          label: 'Negative',
+          score: confidenceScores.negative
+        };
+      default:
+        return { 
+          color: '#ffeb3b', 
+          label: 'Neutral',
+          score: 0 
+        };
+    }
+  };
+
+  const { color, label, score } = getSentimentInfo();
+  
+  // Calculate needle position based on confidenceScores
+  const calculateNeedlePosition = () => {
+    const confidenceScores = sentiment?.confidenceScores || { positive: 0, neutral: 0, negative: 0 };
+    
+    // Calculate weighted position: -1 (negative) to +1 (positive)
+    // where negative has full weight on left side, positive on right side, and neutral in middle
+    const position = confidenceScores.positive - confidenceScores.negative;
+    
+    // Convert to degrees for the needle (mapping -1...1 to -90...90)
+    return position * 90;
+  };
   
   return (
     <div className="agent-panel">
-      <h2>Agent Notes</h2>
-      
-      <div className="agent-notes">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Take notes during the call here..."
-          disabled={callStatus !== 'connected' && !currentCall}
-        />
-        
-        <div className="notes-actions">
-          <button 
-            className="save-notes-btn"
-            onClick={handleSaveNotes}
-            disabled={callStatus !== 'connected' && !currentCall}
-          >
-            Save Notes
-          </button>
-        </div>
-      </div>
-      
-      <div className="suggested-responses">
-        <h3>Suggested Responses</h3>
-        <div className="response-list">
-          {callStatus === 'connected' ? (
-            <>
-              <button className="response-btn">I understand your concern</button>
-              <button className="response-btn">Let me check that for you</button>
-              <button className="response-btn">Could you please provide more details?</button>
-              <button className="response-btn">I'll need to put you on a brief hold</button>
-              <button className="response-btn">Thank you for your patience</button>
-            </>
-          ) : (
-            <div className="no-suggestions">
-              Suggestions will appear during an active call
+      {callStatus === 'connected' && (
+        <div className="sentiment-meter">
+          <h3>Customer Sentiment</h3>
+          <div className="sentiment-container">
+            <div className="sentiment-gauge">
+              <div className="sentiment-gauge-background">
+                <div className="sentiment-gradient"></div>
+              </div>
+              <div 
+                className="sentiment-needle" 
+                style={{ transform: `rotate(${calculateNeedlePosition()}deg)` }}
+              ></div>
             </div>
-          )}
+            <div className="sentiment-value" style={{ color }}>
+              {label}
+              <span className="sentiment-score">({(score || 0).toFixed(2)})</span>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+      
+
+      
+
 
       <div className="suggested-responses">
         <h3>AI Recommendation</h3>
@@ -98,6 +135,8 @@ const AgentPanel = ({ callStatus, currentCall, recommendation }) => {
           )}
         </div>
       </div>
+
+      
     </div>
   );
 };

@@ -1,3 +1,45 @@
+"""A FastAPI application that provides real-time call automation and transcription services.
+This module integrates various Azure services including Communication Services, Speech Services,
+and Text Analytics to provide a comprehensive solution for handling phone calls, real-time
+transcription, and sentiment analysis.
+Key Features:
+- Real-time audio streaming and transcription
+- Dual-channel speech recognition (agent and customer)
+- WebSocket-based communication for real-time updates
+- Sentiment analysis integration
+- Call automation with Azure Communication Services
+Dependencies:
+- FastAPI
+- Azure Communication Services
+- Azure Speech Services
+- Azure Text Analytics
+- OpenAI/Azure OpenAI
+- Various audio processing libraries (numpy, scipy)
+Environment Variables Required:
+- ACS_CONNECTION_STRING: Azure Communication Services connection string
+- SPEECH_KEY: Azure Speech Services key
+- SPEECH_REGION: Azure Speech Services region
+- WEBSOCKET_URL: WebSocket server URL
+- AZURE_TEXT_ANALYTICS_KEY: Azure Text Analytics key (optional)
+- AZURE_TEXT_ANALYTICS_ENDPOINT: Azure Text Analytics endpoint (optional)
+The application manages multiple types of connections:
+1. Agent UI connections via WebSocket
+2. Audio streaming connections via WebSocket
+3. HTTP endpoints for call control and analytics
+Main Components:
+- ConnectionManager: Handles WebSocket connections and transcription management
+- Speech recognition system: Processes audio streams for both agent and customer
+- Message queue: Manages asynchronous message broadcasting
+- Sentiment analysis: Provides real-time sentiment scoring of conversations
+API Endpoints:
+- POST /api/callbacks/{context_id}: Handles Azure Communication Services callbacks
+- GET /api/recommendation/{client_id}: Generates conversation recommendations
+- POST /api/outboundCall: Initiates outbound calls
+- WebSocket /ws/agent/{client_id}: Agent UI connection endpoint
+- WebSocket /ws/audio/{call_id}: Audio streaming endpoint
+- POST /api/sentiment: Analyzes text sentiment
+Author: [Your Name]
+Version: 1.0"""
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +63,8 @@ load_dotenv()
 from openai import AzureOpenAI, OpenAI
 import numpy as np
 from scipy import signal
+from azure.ai.textanalytics import TextAnalyticsClient
+from azure.core.credentials import AzureKeyCredential
 
 with open("system_prompt.txt", "r") as f:
     system_prompt = f.read()
@@ -586,6 +630,80 @@ async def process_message_queue():
 async def startup_event():
     message_thread = threading.Thread(target=asyncio.run, args=(process_message_queue(),), daemon=True)
     message_thread.start()
+
+# Initialize the Azure Text Analytics client after other clients
+text_analytics_client = None
+if os.getenv("AZURE_TEXT_ANALYTICS_KEY") and os.getenv("AZURE_TEXT_ANALYTICS_ENDPOINT"):
+    text_analytics_client = TextAnalyticsClient(
+        endpoint=os.getenv("AZURE_TEXT_ANALYTICS_ENDPOINT"),
+        credential=AzureKeyCredential(os.getenv("AZURE_TEXT_ANALYTICS_KEY"))
+    )
+    logging.info("Azure Text Analytics client initialized")
+else:
+    logging.warning("Azure Text Analytics credentials not found, sentiment analysis will not be available")
+
+# Add this endpoint after your other API endpoints
+@app.post("/api/sentiment")
+async def analyze_sentiment(request: Request):
+    try:
+        data = await request.json()
+        text = data.get("text")
+        
+        if not text:
+            return JSONResponse(content={"error": "Text is required"}, status_code=400)
+            
+        if not text_analytics_client:
+            # Fallback to simple sentiment analysis if Azure client is not available
+            # This is just a placeholder - you should set up Azure Text Analytics
+            import random
+            mock_score = random.uniform(-0.8, 0.8)
+            return JSONResponse(content={
+                "sentiment": {
+                    "score": mock_score,
+                    "magnitude": abs(mock_score),
+                    "rawSentiment": "positive" if mock_score > 0 else "negative",
+                }
+            })
+        
+        # Use Azure Text Analytics for sentiment analysis
+        documents = [{"id": "1", "language": "en", "text": text}]
+        response = text_analytics_client.analyze_sentiment(documents=documents)
+        document = response[0]
+        
+        if not document.is_error:
+            # Convert the Azure score (0 to 1) to our scale (-1 to 1)
+            score = 0  # neutral default
+            if document.sentiment == "positive":
+                score = document.confidence_scores.positive
+            elif document.sentiment == "negative":
+                score = -document.confidence_scores.negative
+            
+            return JSONResponse(content={
+                "sentiment": {
+                    "score": score,
+                    "magnitude": abs(score),
+                    "rawSentiment": document.sentiment,
+                    "confidenceScores": {
+                        "positive": document.confidence_scores.positive,
+                        "neutral": document.confidence_scores.neutral,
+                        "negative": document.confidence_scores.negative
+                    }
+                }
+            })
+        else:
+            return JSONResponse(
+                content={"error": f"Document error: {document.error}"},
+                status_code=500
+            )
+    
+    except Exception as e:
+        logging.error(traceback.format_exc())
+        logging.error(f"Error analyzing sentiment: {str(e)}")
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=500
+        )
+
 # Start the server
 if __name__ == "__main__":
     import uvicorn

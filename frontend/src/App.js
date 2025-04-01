@@ -9,6 +9,7 @@ import AgentAudioPanel from './components/AgentAudioPanel';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 const recommendationWorker = new Worker(new URL('./components/recommendationWorker.js', import.meta.url));
+const sentimentWorker = new Worker(new URL('./components/sentimentWorker.js', import.meta.url));
 
 function App() {
   const [callStatus, setCallStatus] = useState('idle'); // idle, initiating, connected, disconnected
@@ -17,6 +18,7 @@ function App() {
   const [agentId] = useState(`agent-${Math.floor(Math.random() * 1000)}`);
   const [connected, setConnected] = useState(false);
   const [recommendation, setRecommendation] = useState('');
+  const [sentiment, setSentiment] = useState({ score: 0, magnitude: 0 });
   const wsRef = useRef(null);
   const fetchRecommendation = useCallback(() => {
     if (!currentCall?.id) return;
@@ -36,6 +38,36 @@ function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    sentimentWorker.onmessage = (event) => {
+      const { success, data, error } = event.data;
+      if (success) {
+        setSentiment(data.sentiment);
+      } else {
+        console.error("Failed to fetch sentiment:", error);
+      }
+    };
+  }, []);
+
+  // Analyze sentiment whenever transcriptions update
+  useEffect(() => {
+    if (callStatus === 'connected' && transcriptions.length > 0) {
+      // Get the last 5 customer transcriptions (or fewer if there aren't 5)
+      const recentTranscriptions = transcriptions
+        .filter(t => t.speaker === 'customer')
+        .slice(-5)
+        .map(t => t.text)
+        .join(' ');
+      
+      if (recentTranscriptions) {
+        sentimentWorker.postMessage({
+          apiUrl: `${API_BASE_URL}/api/sentiment`,
+          transcriptionText: recentTranscriptions
+        });
+      }
+    }
+  }, [transcriptions, callStatus]);
 
   useEffect(() => {
     if (callStatus === 'connected') {
@@ -232,6 +264,7 @@ function App() {
             callStatus={callStatus}
             currentCall={currentCall}
             recommendation={recommendation}
+            sentiment={sentiment}
           />
 
         </div>

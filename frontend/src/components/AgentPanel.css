@@ -87,3 +87,68 @@
     text-align: center;
     font-style: italic;
   }
+
+  /* Add this to your existing AgentPanel.css file */
+
+.sentiment-meter {
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sentiment-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sentiment-gauge {
+  position: relative;
+  width: 200px;
+  height: 100px;
+  margin-bottom: 10px;
+}
+
+.sentiment-gauge-background {
+  position: absolute;
+  width: 200px;
+  height: 100px;
+  border-radius: 100px 100px 0 0;
+  overflow: hidden;
+  background-color: #ddd;
+}
+
+.sentiment-gradient {
+  position: absolute;
+  width: 200px;
+  height: 100px;
+  border-radius: 100px 100px 0 0;
+  background: linear-gradient(90deg, #f44336 0%, #ffeb3b 50%, #4caf50 100%);
+}
+
+.sentiment-needle {
+  position: absolute;
+  bottom: 0;
+  left: 100px;
+  width: 4px;
+  height: 90px;
+  background-color: #333;
+  transform-origin: bottom center;
+  transition: transform 1s ease-in-out;
+  border-radius: 2px;
+}
+
+.sentiment-value {
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 5px;
+  transition: color 0.5s;
+}
+
+.sentiment-score {
+  font-size: 14px;
+  opacity: 0.7;
+  margin-left: 5px;
+}
